@@ -20,7 +20,7 @@ public class Matrix
             Pixels[i, j] = new Pixel(0, 0, 0, PixelFormat.RGB);
    }
 
-   private Matrix(Pixel[,] pixels)
+   public Matrix(Pixel[,] pixels)
    {
       ArgumentNullException.ThrowIfNull(pixels);
 
@@ -47,6 +47,28 @@ public class Matrix
             pixelMatrix[j, i] = new Pixel(*(ptr + 2), *(ptr + 1), *ptr, PixelFormat.RGB);
 
       return new Matrix(pixelMatrix);
+   }
+
+   public unsafe Bitmap ToBitmap()
+   {
+      var bitmap = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+      var data = bitmap.LockBits(new Rectangle(new Point(), new Size(Width, Height)),
+                                 System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                                 System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+      var ptr = (byte*)data.Scan0.ToPointer();
+
+      for (var j = 0; j < Height; j++)
+         for (var i = 0; i < Width; i++, ptr += 3)
+         {
+            var pixel = Pixels[j, i];
+            *ptr = ToByte(pixel.B);
+            *(ptr + 1) = ToByte(pixel.G);
+            *(ptr + 2) = ToByte(pixel.R);
+         }
+
+      bitmap.UnlockBits(data);
+      return bitmap;
    }
 
    public static explicit operator Matrix(Bitmap bmp)
@@ -83,13 +105,13 @@ public class Matrix
       return bmp;
    }
 
-   public static int ToByte(double d)
+   public static byte ToByte(double d)
    {
       var val = (int)d;
       if (val > byte.MaxValue)
          return byte.MaxValue;
       if (val < byte.MinValue)
          return byte.MinValue;
-      return val;
+      return (byte)val;
    }
 }

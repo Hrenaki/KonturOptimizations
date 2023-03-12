@@ -31,7 +31,7 @@ public class JpegProcessor : IJpegProcessor
 	{
 		var compressedImage = CompressedImage.Load(compressedImagePath);
 		var uncompressedImage = Uncompress(compressedImage);
-		var resultBmp = (Bitmap)uncompressedImage;
+		var resultBmp = uncompressedImage.ToBitmap();
 		resultBmp.Save(uncompressedImagePath, ImageFormat.Bmp);
 	}
 
@@ -79,12 +79,9 @@ public class JpegProcessor : IJpegProcessor
 
 	private static Matrix Uncompress(CompressedImage image)
 	{
-		var result = new Matrix(image.Height, image.Width);
+		var pixels = new Pixel[image.Height, image.Width];
 
 		var allQuantizedBytes = HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount);
-
-      //var quantizedBytes = new byte[DCTSize * DCTSize];
-
 		var quantizationMatrix = GetQuantizationMatrix(image.Quality);
 
 		Parallel.For(0, image.Height / DCTSize, i =>
@@ -114,11 +111,11 @@ public class JpegProcessor : IJpegProcessor
                k++;
             }
 
-            SetPixels(result, _y, cb, cr, PixelFormat.YCbCr, y, x);
+            SetPixels(pixels, _y, cb, cr, PixelFormat.YCbCr, y, x);
          }
       });
 
-		return result;
+		return new Matrix(pixels);
 	}
 
    private static void ShiftMatrixValues(double[,] subMatrix, int shiftValue)
@@ -131,13 +128,11 @@ public class JpegProcessor : IJpegProcessor
 			subMatrix[y, x] += shiftValue;
 	}
 
-	private static void SetPixels(Matrix matrix, double[,] a, double[,] b, double[,] c, PixelFormat format,
+	private static void SetPixels(Pixel[,] pixels, double[,] a, double[,] b, double[,] c, PixelFormat format,
 		int yOffset, int xOffset)
 	{
 		var height = a.GetLength(0);
 		var width = a.GetLength(1);
-
-		var pixels = matrix.Pixels;
 
 		for (var y = 0; y < height; y++)
 		for (var x = 0; x < width; x++)
