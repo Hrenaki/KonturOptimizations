@@ -60,12 +60,12 @@ public class DCT
 		return a * b * c;
 	}
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static readonly double OneDividedOnSqrtTwo = 1 / Math.Sqrt(2);
+
+   [MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static double Alpha(int u)
 	{
-		if (u == 0)
-			return 1 / Math.Sqrt(2);
-		return 1;
+		return u > 0 ? 1 : OneDividedOnSqrtTwo;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

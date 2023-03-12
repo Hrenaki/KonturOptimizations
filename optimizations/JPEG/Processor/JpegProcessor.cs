@@ -80,35 +80,43 @@ public class JpegProcessor : IJpegProcessor
 	private static Matrix Uncompress(CompressedImage image)
 	{
 		var result = new Matrix(image.Height, image.Width);
-		using (var allQuantizedBytes =
-		       new MemoryStream(HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount)))
+
+		var allQuantizedBytes = HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount);
+
+      //var quantizedBytes = new byte[DCTSize * DCTSize];
+
+		var quantizationMatrix = GetQuantizationMatrix(image.Quality);
+
+		Parallel.For(0, image.Height / DCTSize, i =>
 		{
-         var _y = new double[DCTSize, DCTSize];
-         var cb = new double[DCTSize, DCTSize];
-         var cr = new double[DCTSize, DCTSize];
-			var channels = new[] { _y, cb, cr };
+			var y = i * DCTSize;
 
-         var quantizedBytes = new byte[DCTSize * DCTSize];
+         for (var j = 0; j < image.Width / DCTSize; j++)
+         {
+				var x = j * DCTSize;
 
-			var quantizationMatrix = GetQuantizationMatrix(image.Quality);
+				var doubleMatrixBuffer = new double[DCTSize, DCTSize];
 
-         for (var y = 0; y < image.Height; y += DCTSize)
-			{
-				for (var x = 0; x < image.Width; x += DCTSize)
-				{
-					foreach (var channel in channels)
-					{
-						allQuantizedBytes.ReadAsync(quantizedBytes, 0, quantizedBytes.Length).Wait();
-						var quantizedFreqs = ZigZagUnScan(quantizedBytes);
-						var channelFreqs = DeQuantize(quantizedFreqs, quantizationMatrix);
-						DCT.IDCT2D(channelFreqs, channel);
-						ShiftMatrixValues(channel, 128);
-					}
+            var _y = new double[DCTSize, DCTSize];
+            var cb = new double[DCTSize, DCTSize];
+            var cr = new double[DCTSize, DCTSize];
+            var channels = new[] { _y, cb, cr };
 
-					SetPixels(result, _y, cb, cr, PixelFormat.YCbCr, y, x);
-				}
-			}
-		}
+            var k = 0;
+            foreach (var channel in channels)
+            {
+               var quantizedBytes = new Span<byte>(allQuantizedBytes, (i * image.Width / DCTSize * 3 + j * 3 + k) * DCTSize * DCTSize, DCTSize * DCTSize);
+               var quantizedFreqs = ZigZagUnScan(quantizedBytes);
+               DeQuantize(quantizedFreqs, quantizationMatrix, doubleMatrixBuffer);
+               DCT.IDCT2D(doubleMatrixBuffer, channel);
+               ShiftMatrixValues(channel, 128);
+
+               k++;
+            }
+
+            SetPixels(result, _y, cb, cr, PixelFormat.YCbCr, y, x);
+         }
+      });
 
 		return result;
 	}
@@ -129,9 +137,11 @@ public class JpegProcessor : IJpegProcessor
 		var height = a.GetLength(0);
 		var width = a.GetLength(1);
 
+		var pixels = matrix.Pixels;
+
 		for (var y = 0; y < height; y++)
 		for (var x = 0; x < width; x++)
-			matrix.Pixels[yOffset + y, xOffset + x] = new Pixel(a[y, x], b[y, x], c[y, x], format);
+         pixels[yOffset + y, xOffset + x] = new Pixel(a[y, x], b[y, x], c[y, x], format);
 	}
 
 	private static void GetSubMatrix(Matrix matrix, int yOffset, int yLength, int xOffset, int xLength,
@@ -168,7 +178,7 @@ public class JpegProcessor : IJpegProcessor
 		};
 	}
 
-	private static byte[,] ZigZagUnScan(byte[] quantizedBytes)
+	private static byte[,] ZigZagUnScan(Span<byte> quantizedBytes)
 	{
 		return new[,]
 		{
@@ -217,21 +227,20 @@ public class JpegProcessor : IJpegProcessor
             output[y, x] = (byte)(channelFreqs[y, x] / quantizationMatrix[y, x]);
 	}
 
-	private static double[,] DeQuantize(byte[,] quantizedBytes, int[,] quantizationMatrix)
+	private static void DeQuantize(byte[,] quantizedBytes, int[,] quantizationMatrix, double[,] output)
 	{
-		var result = new double[quantizedBytes.GetLength(0), quantizedBytes.GetLength(1)];
+		var height = quantizedBytes.GetLength(0);
+		var width = quantizedBytes.GetLength(1);
 
-		for (int y = 0; y < quantizedBytes.GetLength(0); y++)
+		for (int y = 0; y < height; y++)
 		{
-			for (int x = 0; x < quantizedBytes.GetLength(1); x++)
+			for (int x = 0; x < width; x++)
 			{
-				result[y, x] =
+            output[y, x] =
 					((sbyte)quantizedBytes[y, x]) *
                quantizationMatrix[y, x]; //NOTE cast to sbyte not to loose negative numbers
 			}
 		}
-
-		return result;
 	}
 
 	private static int[,] GetQuantizationMatrix(int quality)
