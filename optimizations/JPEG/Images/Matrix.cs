@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Drawing;
-using System.Runtime.InteropServices;
 
 namespace JPEG.Images;
 
@@ -38,23 +37,14 @@ public class Matrix
       var data = bmp.LockBits(new Rectangle(new Point(), new Size(bmp.Width, bmp.Height)),
                               System.Drawing.Imaging.ImageLockMode.ReadOnly,
                               System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-      var ptr = data.Scan0;
-
-      var rgbBuffer = new byte[3];
+      var ptr = (byte*)data.Scan0.ToPointer();
 
       var pixelMatrix = new Pixel[height, width];
+      var offset = bmp.Width % 8 * 3;
+
       for (var j = 0; j < height; j++)
-      {
-         for (var i = 0; i < width; i++)
-         {
-            Marshal.Copy(ptr, rgbBuffer, 0, 3);
-            pixelMatrix[j, i] = new Pixel(rgbBuffer[0], rgbBuffer[1], rgbBuffer[2], PixelFormat.RGB);
-
-            ptr += 3;
-         }
-
-         ptr += bmp.Width % 8 * 3;
-      }
+         for (var i = 0; i < width; i++, ptr += 3)
+            pixelMatrix[j, i] = new Pixel(*(ptr + 2), *(ptr + 1), *ptr, PixelFormat.RGB);
 
       return new Matrix(pixelMatrix);
    }
