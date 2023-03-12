@@ -45,7 +45,7 @@ namespace JPEG.Benchmarks.Benchmarks
          var sb = new StringBuilder();
          for (var j = 0; j < 3; j++)
          {
-            sb.Append("byte;");
+            sb.Append($"{matrix.Pixels[j, 0].R};");
          }
          return sb.ToString();
       }
