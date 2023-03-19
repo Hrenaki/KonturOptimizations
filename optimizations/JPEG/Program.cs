@@ -13,6 +13,7 @@ internal class Program
 			Console.WriteLine(IntPtr.Size == 8 ? "64-bit version" : "32-bit version");
 			var processor = JpegProcessor.Init;
 			var sw = Stopwatch.StartNew();
+			//var imagePath = @"earth.bmp";
 			var imagePath = @"sample.bmp";
 			// var imageName = "Big_Black_River_Railroad_Bridge.bmp";
 			var compressedImagePath = imagePath + ".compressed." + JpegProcessor.CompressionQuality;
